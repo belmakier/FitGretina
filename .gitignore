@@ -1,0 +1,32 @@
+# ignore text editor stuff
+*.bak
+*~
+\#*\#
+.\#*
+
+
+# ignore usual data files
+*.m4b
+*.spn
+*.root
+*.run*
+*.pre*
+*.dat
+
+# compiled files
+bin/*
+
+# compile objects
+*.so
+*.d
+*.pcm
+*.d
+*.o
+
+# root stuff
+AutoDict*
+
+# CMake Stuff
+CMake*
+!Makefile
+!CMakeLists.txt

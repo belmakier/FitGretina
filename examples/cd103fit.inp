@@ -1,0 +1,37 @@
+INPUT   Sn106_Cd104.root
+TYPE    1D
+DOP_P   gret_s800_dop3_comb2 
+DOP_NP  gret_s800_dop3_comb2_np 
+NODOP   gret_s800_nodop_comb2 
+NP_SCALE 0.35
+FFILE  NUC ../root/cd103_188.root            gret_dop3 gret_gamma cd103_188         0.7
+FFILE  NUC ../root/cd103_202.root            gret_dop3 gret_gamma cd103_202         0.24
+FFILE  NUC ../root/cd103_333.root            gret_dop3 gret_gamma cd103_333         0.04
+FFILE  NUC ../root/cd103_392.root            gret_dop3 gret_gamma cd103_392         0.11
+FFILE  NUC ../root/cd103_570.root            gret_dop3 gret_gamma cd103_570         0.06
+FFILE  NUC ../root/cd103_726.root            gret_dop3 gret_gamma cd103_726         0.07
+FFILE  NUC ../root/cd103_740.root            gret_dop3 gret_gamma cd103_740         0.23
+FFILE  NUC ../root/cd103_908.root            gret_dop3 gret_gamma cd103_908         0.16
+FFILE  NUC ../root/cd103_1104.root           gret_dop3 gret_gamma cd103_1104        0.17
+FFILE  NUC ../root/cd103_1513.root           gret_dop3 gret_gamma cd103_1513        0.19
+FFILE  NUC ../root/cd103_1671.root           gret_dop3 gret_gamma cd103_1671        0.05
+FFILE  NUC ../lt2571/56/root/cd103_2571.root gret_dop3 gret_gamma cd103_2571        0.05
+FFILE  NUC ../root/cd103_2612.root           gret_dop3 gret_gamma cd103_2612        0.05
+FFILE  NUC ../root/cd103_1307.root           gret_dop3 gret_gamma cd103_1307        0.01
+FFILE  NUC ../root/cd103_280.root            gret_dop3 gret_gamma cd103_280         0.23
+FFILE  NUC ../root/cd103_750.root            gret_dop3 gret_gamma cd103_750         0.07
+FFILE  NUC ../root/cd103_777.root            gret_dop3 gret_gamma cd103_777         0.07
+FFILE  BKG ../root/source_1to3MeV.root       gret_dop  gret_gamma source_1to3MeV    0.002 
+FFILE  BKG ../root/source_3to6MeV.root       gret_dop  gret_gamma source_3to6MeV    0.002 
+FFILE  BKG ../root/source_6to10MeV.root      gret_dop  gret_gamma source_6to10MeV   0.002
+FFILE  BKG ../root/source_10to30MeV.root     gret_dop  gret_gamma source_10to30MeV  0.002
+FFILE  BKG ../root/source_30to60MeV.root     gret_dop  gret_gamma source_30to60MeV  0.002
+FFILE  BKG ../root/source_60to80MeV.root     gret_dop  gret_gamma source_60to80MeV  0.0004
+FFILE  BKG ../root/source_80to100MeV.root    gret_dop  gret_gamma source_80to100MeV 0.0002
+DOPBKG  100 800 0  0
+NDBKG   100 800 0  0
+RANGE   100 4096
+ROI     100 1000
+OUTDAT  Cd104_Cd103Fit_4.dat
+OUTROOT Cd103fits_4.root
+OUTPDF  Cd104_Cd103Fit.pdf
