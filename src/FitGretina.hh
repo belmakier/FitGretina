@@ -46,6 +46,9 @@ public:
   int binwidth = 1; //this represents the number of DTA bins going into the fitted histograms
   int method = 1; //1 = LL, 0 = chi2
   bool doubleExp;
+  bool singleExp;
+  bool scaledBkg;
+  double nondop_chi2_scale;
 
   //background parameters
   double amp1, amp2;
@@ -56,6 +59,9 @@ public:
   double nondop_amp1, nondop_amp2;
   double nondop_tau1, nondop_tau2;
   TF1 *nondop_bkgd;
+
+  double bkg_scale_slope;
+  double bkg_scale_slope_nd;
 
   //fit range
   double low, high;
@@ -71,6 +77,7 @@ public:
   TGraph *getfunc(int ind, const double *par);
   TGraph *nondop_getfunc(int ind, const double *par);
   TH1D* get_bs_hist();
+  TH1D* get_nd_hist();
 };
 
 class fitManager {
@@ -88,8 +95,12 @@ public:
   int gate = -1;
   double gate_low, gate_high;
   double np_scale = 1;
+  std::string bkgType;
   bool doubleExp = true;
+  bool singleExp = true;
+  bool scaledBkg = false;
   bool nofit = false;
+  double nondop_chi2_scale;
   std::string errorType;
   std::vector<std::string> ffiles;
   std::vector<std::string> labels;

@@ -17,7 +17,6 @@ What we want to do is appropriately scale the response function histograms so th
 
 Background
 ----------
-
 Unfortunately, the experimental spectrum is not only composed of response functions from the residual nucleus of interest. In reality, there are other things creating gamma rays that need to be accounted for. There are three primary sources which are accounted for in different ways by FitGretina
 
 1. non-correlated background (i.e., room background)
@@ -40,14 +39,13 @@ In addition to the previous two backgrounds, an exponential function is often us
 
 Using FitGretina
 ----------------
-
 FitGretina uses an input file to specify the fitting options, the experimental input, and the desired output. These input files are simple in format, with each line consisting of a keyword and then (usually) one or more values. The various keywords and their meaning are below
 
 INPUT [filename]
 The ROOT file which contains the experimental histograms.
 
 TYPE [histogram type]
-Type should be 1D or 2D corresponding to whether the experimental histograms are 1D or 2D. If 2D is used, one of two situations must be satisfied:
+Type should be "1D" or "2D" corresponding to whether the experimental histograms are 1D or 2D. If 2D is used, one of two situations must be satisfied:
 1. the PROJX keyword is used to specify which y-bin should be used. This is a useful mode if multiple residuals are being considered: i.e. the 2D histogram may be Doppler-corrected gamma energy (x) vs residual ID (y).
 2. the GATE keyword is used to specify a y-range to gate on. This is useful when constructing, for example, a parallel-momentum distribution. A 2D histogram could be gamma energy (x) vs parallel momentum (y), and FitGretina could fit different slices of the parallel momentum distribution. 
 
@@ -73,7 +71,7 @@ ERROR [error type]
 Specify how the fitted errors will be extracted. Possible values are MINOS or HESSE. HESSE is default, fast, but probably inaccurate. Good for getting a good fit dialed in, but don't trust the uncertainties. MINOS is more reliable and much slower. In reality, if MINOS is specified, I attempt to use the GetMinosError function from the ROOT minimizer, and if it fails I do my own estimation.
 
 ROI [low] [high]
-Region of interest for zoomed plot and chi^2. This is not used in the fit per se, but useful for inspecting the output.
+Region of interest for zoomed plot and chi^2. This is not used in the fit, but useful for inspecting the output.
 
 FFILE [type] [filename] [histogram] [non-Doppler histogram] [label] [value]
 This is the specification of a response function. 
@@ -114,11 +112,16 @@ Valid methods are "CHI2" or "LOGLIKELIHOOD", which corresponds to the evaluation
 NOFIT
 This has no keyword. If present, it will fix all parameters to their starting values and immediately return the fit (i.e., no adjustment or actual fitting takes place). This can be useful for picking good starting guesses, or adjusting things by hand to see the effect of raising or lowering particular states.
 
+BKGTYPE [type]
+Specify the method to use for backgrounds. This can be "EXP" (single exponential + non-Doppler-corrected + non-Prompt), "DOUBLEEXP" (the same but a double-exponential as the functional form), "NONE" for no heuristic background (only non-Doppler-corrected and non-Prompt), or "SCALED". "SCALED" takes the simulated backgrounds (specified with "BKG" above) and multiplies them by a freely fitted linear term. This heuristically weights lower or higher energies which may not be completely reproduced by the simulation.
+
+ND_CHI2_SCALE [scale]
+Scaling factor for the non-Doppler-corrected Chi^2. In some cases, we may want to weight the non-Doppler-corrected fit less than the Doppler-corrected fit. Ideally both would be reproduced equally well, but this is not always the case.
+
 You can see some examples of input files in the examples/ folder
 
 Fitting a single spectrum
 -------------------------
-
 The most basic task is fitting a single spectrum. A program which does this is contained with the library, it should be located in the bin/ directory. Its source can be viewed in src/SingleFit.cc
 
 Its operation is very simple: it opens an input file specified by a command-line argument, and loads it into the "fitManager" object. The "fitManager" then conducts the fit with DoFit(), and writes the output final chi^2 to a file.

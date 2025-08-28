@@ -25,8 +25,10 @@ fit::fit(double l, double h) {
   low = l;
   high = h;
   doubleExp = true;
+  singleExp = true;
   bkgd = new TF1("bkgd", "[0]*exp(-x/[1]) + [2]*exp(-x/[3])", low, high);
   nondop_bkgd = new TF1("nondop_bkgd", "[0]*exp(-x/[1]) + [2]*exp(-x/[3])", low, high);
+  nondop_chi2_scale = 1.0;
 }
 
 void fit::load() {
@@ -46,10 +48,18 @@ void fit::load() {
   
 std::pair<double,double> fit::eval(double x) {
   std::pair<double,double> val;
-  val.first = bkgd->Eval(x);
+  if (!scaledBkg) {
+    val.first = bkgd->Eval(x);
+  }
+  else {
+    val.first = 0;
+  }
   val.second = 0;
   for (int i=0; i<hists.size(); ++i) {
     double cts = hists[i]->GetBinContent(hists[i]->GetXaxis()->FindBin(x));
+    if (!types[i].compare("BKG")) {
+      cts = cts * (1.0 + (x-500.0)*bkg_scale_slope);
+    }
     val.first += scales[i]*cts*binwidth;
     val.second += cts*scales[i]*scales[i]*binwidth*binwidth;
   }
@@ -60,11 +70,19 @@ std::pair<double,double> fit::eval(double x) {
 std::pair<double,double> fit::nondop_eval(double x) {
   std::pair<double,double> val;
   //double val = nondop_bkgd->Eval(x);
-  val.first = nondop_bkgd->Eval(x);
+  if (!scaledBkg) {
+    val.first = nondop_bkgd->Eval(x);
+  }
+  else {
+    val.first = 0.0;
+  }
   val.second = 0;
   for (int i=0; i<nondop_hists.size(); ++i) {
     //val += scales[i]*nondop_hists[i]->GetBinContent(nondop_hists[i]->GetXaxis()->FindBin(x));
     double cts = nondop_hists[i]->GetBinContent(nondop_hists[i]->GetXaxis()->FindBin(x));
+    if (!types[i].compare("BKG")) {
+      cts = cts * (1.0 + (x-500.0)*bkg_scale_slope_nd);
+    }
     val.first += scales[i]*cts*binwidth;
     val.second += cts*scales[i]*scales[i]*binwidth*binwidth;
   }
@@ -73,23 +91,28 @@ std::pair<double,double> fit::nondop_eval(double x) {
 }
   
 double fit::operator()(const double *par) {
-  amp1 = par[0];
-  tau1 = par[1];
-  amp2 = par[2];
-  tau2 = par[3];
+  if (!scaledBkg) {
+    amp1 = par[0];
+    tau1 = par[1];
+    amp2 = par[2];
+    tau2 = par[3];
 
-  nondop_amp1 = par[4];
-  nondop_tau1 = par[5];
-  nondop_amp2 = par[6];
-  nondop_tau2 = par[7];
+    nondop_amp1 = par[4];
+    nondop_tau1 = par[5];
+    nondop_amp2 = par[6];
+    nondop_tau2 = par[7];
 
+    for (int i=0; i<4; ++i) {
+      bkgd->SetParameter(i, par[i]);
+    }
 
-  for (int i=0; i<4; ++i) {
-    bkgd->SetParameter(i, par[i]);
+    for (int i=4; i<8; ++i) {
+      nondop_bkgd->SetParameter(i-4, par[i]);
+    }
   }
-
-  for (int i=4; i<8; ++i) {
-    nondop_bkgd->SetParameter(i-4, par[i]);
+  else {
+    bkg_scale_slope = par[0];
+    bkg_scale_slope_nd = par[1];
   }
 
   for (int i=0; i<scales.size(); ++i) {
@@ -114,10 +137,10 @@ double fit::operator()(const double *par) {
       std::pair<double, double> val;
       val = nondop_eval(expthist->GetBinCenter(i));
       if (nondop_expthist->GetBinContent(i) > 0) {
-        chi2 += std::pow((nondop_expthist->GetBinContent(i) - val.first), 2)/(std::pow(nondop_expthist->GetBinError(i), 2) + std::pow(val.second, 2));
+        chi2 += nondop_chi2_scale * std::pow((nondop_expthist->GetBinContent(i) - val.first), 2)/(std::pow(nondop_expthist->GetBinError(i), 2) + std::pow(val.second, 2));
       }
       else {
-        chi2 += std::pow((nondop_expthist->GetBinContent(i) - val.first), 2)/(1.0 + std::pow(val.second, 2));
+        chi2 += nondop_chi2_scale * std::pow((nondop_expthist->GetBinContent(i) - val.first), 2)/(1.0 + std::pow(val.second, 2));
       }
     }
   }
@@ -144,10 +167,10 @@ double fit::operator()(const double *par) {
       double y = nondop_expthist->GetBinContent(i);
       if (y > 0) {
         val.first = std::max(val.first, 1e-5);
-        nll += (val.first + y * TMath::Log(y/val.first) - y);
+        nll += nondop_chi2_scale * (val.first + y * TMath::Log(y/val.first) - y);
       }
       else {
-        nll += val.first;
+        nll += nondop_chi2_scale * val.first;
       }
     }
     chi2 = 2.0*nll;
@@ -161,13 +184,22 @@ double fit::operator()(const double *par) {
       }
       std::cout << std::flush;
     }
-    else {
+    else if (singleExp) {
       std::cout << "\r" << Form("%9.8g", chi2) << " : ";
       for (int i=0; i<std::min((int)(8+scales.size()), 17); ++i) {
         if (i==2 || i==3 || i==6 || i==7) { continue; }
         std::cout << Form("%9.3g  ", par[i]);
       }
       std::cout << std::flush;
+    }
+    else {
+      std::cout << "\r" << Form("%9.8g", chi2) << " : ";
+      for (int i=0; i<std::min((int)(8+scales.size()), 17); ++i) {
+        if (i<=7) { continue; }
+        std::cout << Form("%9.3g  ", par[i]);
+      }
+      std::cout << std::flush;
+
     }
   }
   evalct += 1;
@@ -235,6 +267,11 @@ TH1D* fit::get_bs_hist() {
   TH1D* expthist_bs = (TH1D*)expthist->Clone("expthist_bs");
   expthist_bs->Add(np_expthist, -np_scale);
   return expthist_bs;
+}
+
+TH1D* fit::get_nd_hist() {
+  TH1D* expthist_nd = (TH1D*)nondop_expthist->Clone("expthist_nd");
+  return expthist_nd;
 }
 
 fitManager::fitManager() {
@@ -340,7 +377,6 @@ void fitManager::Read(std::string inpfile) {
       dopBgPars.push_back(b);
       dopBgPars.push_back(c);
       dopBgPars.push_back(d);
-      if (c==0 && d==0) { doubleExp = false; }          
     }
     else if (!keyword.compare("NDBKG")) {
       double a,b,c,d;
@@ -349,7 +385,6 @@ void fitManager::Read(std::string inpfile) {
       nodopBgPars.push_back(b);
       nodopBgPars.push_back(c);
       nodopBgPars.push_back(d);
-      if (c==0 && d==0) { doubleExp = false; }
     }
     else if (!keyword.compare("RANGE")) {
       ss >> low >> high;
@@ -371,6 +406,32 @@ void fitManager::Read(std::string inpfile) {
     }
     else if (!keyword.compare("METHOD")) {
       ss >> method;
+    }
+    else if (!keyword.compare("BKGTYPE")) {
+      ss >> bkgType;
+      if (!bkgType.compare("EXP")) {
+        singleExp = true;
+        doubleExp = false;
+        scaledBkg = false;
+      }
+      else if (!bkgType.compare("DOUBLEEXP")) {
+        singleExp = true;
+        doubleExp = true; 
+        scaledBkg = false;
+      }
+      else if (!bkgType.compare("SCALED")) {
+        singleExp = false;
+        doubleExp = false; 
+        scaledBkg = true;
+      }
+      else if (!bkgType.compare("NONE")) {
+        singleExp = false;
+        doubleExp = false; 
+        scaledBkg = false;
+      }
+    }
+    else if (!keyword.compare("ND_CHI2_SCALE")) {
+      ss >> nondop_chi2_scale;
     }
     else if (!keyword.compare("NOFIT")) {
       nofit = true;
@@ -409,6 +470,7 @@ void fitManager::Setup() {
 
   TFile *expt = new TFile(inpHistFileName.c_str());
   ff->np_scale = np_scale;
+  ff->nondop_chi2_scale = nondop_chi2_scale;
   if (!histType.compare("2D")) {
     TH2F *expt_h2 = expt->Get<TH2F>(dop_p_name.c_str());
     TH2F *expt_h2_np = expt->Get<TH2F>(dop_np_name.c_str());
@@ -482,10 +544,26 @@ void fitManager::PrintHeader(std::vector<std::string> names) {
     }
     std::cout << std::endl;
   }
-  else {
+  else if (singleExp){
     std::cout << "chi2     " << " : ";
     for (int i=0; i<std::min((int)(names.size()), 17); ++i) {
       if (i==2 || i==3 || i==6 || i==7) { continue; }
+      std::cout << Form("%9s  ", names[i].substr(0, std::min(9, (int)names[i].size())).c_str());
+    }
+    std::cout << std::endl;
+  }
+  else if (scaledBkg) {
+    std::cout << "chi2     " << " : ";
+    for (int i=0; i<std::min((int)(names.size()), 17); ++i) {
+      if (i>=2 && i<=7) { continue; }
+      std::cout << Form("%9s  ", names[i].substr(0, std::min(9, (int)names[i].size())).c_str());
+    }
+    std::cout << std::endl;
+  }
+  else {
+    std::cout << "chi2     " << " : ";
+    for (int i=0; i<std::min((int)(names.size()), 17); ++i) {
+      if (i<=7) { continue; }
       std::cout << Form("%9s  ", names[i].substr(0, std::min(9, (int)names[i].size())).c_str());
     }
     std::cout << std::endl;
@@ -505,6 +583,16 @@ double fitManager::DoFit() {
     "nd_amp1", "nd_tau1", "nd_amp2", "nd_tau2"};
   std::vector<double> LL = {0.0, 200.0, 0.0, 200.0, 0.0, 200.0, 0.0, 200.0};
   std::vector<double> UL = {1e4,5e3,1e4,5e3,1e4,5e3,1e4,5e3};
+  if (scaledBkg) {
+    names[0] = "bkg_slope";
+    names[1] = "bkg_slope_nd";
+    pars[0] = dopBgPars[0];
+    pars[1] = nodopBgPars[0];
+    LL[0] = -0.1;
+    LL[1] = -0.1;
+    UL[0] = 0.1;
+    UL[1] = 0.1;
+  }
   for (int i=0; i<ff->scales.size(); ++i) {
     pars.push_back(ff->scales[i]);
     names.push_back(ff->names[i]);
@@ -522,6 +610,8 @@ double fitManager::DoFit() {
   if (min==NULL) { std::cerr << "Minimizer failed to create!" << std::endl; exit(1); }
 
   ff->doubleExp = doubleExp;
+  ff->singleExp = singleExp;
+  ff->scaledBkg = scaledBkg;
 
   ROOT::Math::Functor f_init(*ff,ff->scales.size() + 8);
 	
@@ -542,11 +632,25 @@ double fitManager::DoFit() {
     }
   }
 
-  if (!doubleExp) {
+  if (scaledBkg) {
+    min->SetFixedVariable(2, names[2], 0);
+    min->SetFixedVariable(3, names[3], 1.);
+    min->SetFixedVariable(4, names[3], 0.);
+    min->SetFixedVariable(5, names[3], 1.);
+    min->SetFixedVariable(6, names[6], 0);
+    min->SetFixedVariable(7, names[7], 1.);
+  }
+  if (!doubleExp && !scaledBkg) {
     min->SetFixedVariable(2, names[2], 0);
     min->SetFixedVariable(3, names[3], 1.);
     min->SetFixedVariable(6, names[6], 0);
     min->SetFixedVariable(7, names[7], 1.);
+  }
+  if (!singleExp && !scaledBkg) {
+    min->SetFixedVariable(0, names[0], 0);
+    min->SetFixedVariable(1, names[1], 1.);
+    min->SetFixedVariable(4, names[4], 0);
+    min->SetFixedVariable(5, names[5], 1.);
   }
 
   PrintHeader(names);	
@@ -579,6 +683,7 @@ double fitManager::DoFit() {
     while (ct > 0) {
       if (min->Status() != 0) {
         for( unsigned int i = 0; i < pars.size(); ++i ) {
+          if (i<2 && scaledBkg) { continue; }
           double ul = std::max(0.0001, 3.0*min->X()[i]);
           min->SetLimitedVariable(i, names.at(i), min->X()[i], 0.01, LL.at(i), ul);
           UL[i] = ul;
@@ -614,6 +719,10 @@ double fitManager::DoFit() {
   for (int i=0; i<names.size(); ++i) {
     if (!errorType.compare("MINOS") && !nofit) {
       double low, high;
+      if (!singleExp && (i<=7)) { 
+        ampfile << i << "   " << names.at(i) << "   " << 0.0 << "   " << 0.0 << std::endl;
+        continue;
+      }
       if (!doubleExp && (i==2 || i==3 || i==6 || i==7)) { 
         ampfile << i << "   " << names.at(i) << "   " << 0.0 << "   " << 0.0 << std::endl;
         continue;
@@ -644,6 +753,12 @@ double fitManager::DoFit() {
           new_min->SetFixedVariable(3, names[3], 1.);
           new_min->SetFixedVariable(6, names[6], 0);
           new_min->SetFixedVariable(7, names[7], 1.);
+        }
+        if (!singleExp) {
+          new_min->SetFixedVariable(0, names[0], 0);
+          new_min->SetFixedVariable(1, names[1], 1.);
+          new_min->SetFixedVariable(4, names[4], 0);
+          new_min->SetFixedVariable(5, names[5], 1.);
         }
 
         new_min->Minimize();
@@ -860,6 +975,9 @@ double fitManager::DoFit() {
   gr_bkg->Draw("same L");
   gr_bkg->SetEditable(false);
   gr_bkg->Write();
+
+
+
   c1->Print((outpdf+"(").c_str());
 
   expthist_bs->Draw("E1 same");
@@ -923,11 +1041,17 @@ double fitManager::DoFit() {
 
   TGraph *nondop_gr = ff->nondop_getfunc(min->X());  
 
+  TH1D *expthist_nd = ff->get_nd_hist();
+  expthist_nd->SetDirectory(outfile);
+  expthist_nd->Write();
   TCanvas *c2 = new TCanvas();
   ff->nondop_expthist->Draw("hist");
+  ff->nondop_expthist->GetXaxis()->SetRangeUser(low, high);
   nondop_gr->SetLineWidth(2);
   nondop_gr->Draw("same L");
   nondop_gr->SetEditable(false);
+  nondop_gr->SetName("nondopFitTotal");
+  nondop_gr->Write();
   for (int i=0; i<ff->scales.size(); ++i) {
     //std::cout << ff->names[i] << "   " << ff->scales[i] << std::endl;
     TGraph *gr_i = ff->nondop_getfunc(i, min->X());
@@ -935,6 +1059,7 @@ double fitManager::DoFit() {
     gr_i->SetLineColor(colors[i%8]);
     gr_i->Draw("same L");
     gr_i->SetEditable(false);
+    gr_i->Write();
   }
   c2->Print((outpdf+")").c_str());
     
